@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Real-Time Rocket Launch Dashboard</title>
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+  <style>
+    body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: monospace; background: #0b0c10; color: #66fcf1; }
+    #dashboard { display: flex; width: 100%; height: 100%; }
+    #cesiumContainer { flex: 3; height: 100%; background: #000; }
+    #telemetryPanel { flex: 1; padding: 20px; background: #1f2833; box-shadow: -5px 0 15px rgba(0,0,0,0.5); overflow-y: auto; box-sizing: border-box; }
+    h2 { border-bottom: 2px solid #45f3ff; padding-bottom: 5px; margin-top: 0; color: #fff; }
+    .data-row { display: flex; justify-content: space-between; margin: 12px 0; font-size: 14px; border-bottom: 1px solid #2f3e46; padding-bottom: 4px; }
+    .val { color: #fff; font-weight: bold; }
+    #status { color: #ff3333; font-weight: bold; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+
+  <div id="dashboard">
+    <div id="cesiumContainer"></div>
+    
+    <div id="telemetryPanel">
+      <h2>FLIGHT CONTROL</h2>
+      <div id="status">LOADING TELEMETRY DATA...</div>
+      <div class="data-row"><span>TIME SECONDS:</span> <span id="tel-time" class="val">0.00 s</span></div>
+      <div class="data-row"><span>ALTITUDE (Z):</span> <span id="tel-alt" class="val">0.00 m</span></div>
+      <div class="data-row"><span>DOWNRANGE (X):</span> <span id="tel-x" class="val">0.00 m</span></div>
+      <div class="data-row"><span>CROSSRANGE (Y):</span> <span id="tel-y" class="val">0.00 m</span></div>
+    </div>
+  </div>
+
+  <script>
+    // FIX 1: Use ArcGIS Satellite Server. This bypasses security blocks and removes the blue sphere.
+    const esriSatellite = new Cesium.ArcGisMapServerImageryProvider({
+        url: 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer'
+    });
+
+    const viewer = new Cesium.Viewer('cesiumContainer', {
+      imageryProvider: esriSatellite,
+      baseLayerPicker: false,
+      animation: true,
+      timeline: true,
+      terrainProvider: Cesium.createWorldTerrain()
+    });
+
+    const startIso = "2026-06-23T12:00:00Z";
+    const startJulian = Cesium.JulianDate.fromIso8601(startIso);
+    
+    viewer.clock.startTime = startJulian;
+    viewer.clock.currentTime = startJulian;
+    viewer.clock.stopTime = Cesium.JulianDate.addSeconds(startJulian, 600, new Cesium.JulianDate());
+    viewer.clock.clockRange = Cesium.ClockRange.CLAMPED;
+    viewer.timeline.zoomTo(viewer.clock.startTime, viewer.clock.stopTime);
+
+    // Load the 3D visual track path
+    Cesium.CzmlDataSource.load('trajectory.czml?t=' + Date.now()).then(function(dataSource) {
+      viewer.dataSources.add(dataSource);
+      const rocketEntity = dataSource.entities.getById('rocket_path');
+      if (rocketEntity) {
+        viewer.trackedEntity = rocketEntity; // Locks camera to the vehicle
+      }
+    }).catch(err => {
+      document.getElementById('status').innerText = "ERROR LOADING CZML PATH";
+      console.error(err);
+    });
+
+    // FIX 2: Async data synchronization guard
+    let flightLog = [];
+    fetch('telemetry.json?t=' + Date.now())
+      .then(res => res.json())
+      .then(data => { 
+        flightLog = data; 
+        document.getElementById('status').style.color = "#33ff33";
+        document.getElementById('status').innerText = "SYSTEM READY - PRESS PLAY";
+      })
+      .catch(err => {
+        document.getElementById('status').innerText = "ERROR LOADING JSON DATA";
+        console.error(err);
+      });
+
+    // Real-time HUD translation loop
+    viewer.clock.onTick.addEventListener(function(clock) {
+      if (!flightLog || flightLog.length === 0) return;
+      
+      const secondsElapsed = Cesium.JulianDate.secondsDifference(clock.currentTime, startJulian);
+      
+      // Locate the exact math snapshot based on active timeline position
+      const matchedFrame = flightLog.find(f => f.time >= secondsElapsed) || flightLog[flightLog.length - 1];
+      
+      if (matchedFrame && secondsElapsed >= 0) {
+        document.getElementById('tel-time').innerText = matchedFrame.time.toFixed(2) + " s";
+        document.getElementById('tel-alt').innerText = matchedFrame.z.toFixed(2) + " m";
+        document.getElementById('tel-x').innerText = matchedFrame.x.toFixed(2) + " m";
+        document.getElementById('tel-y').innerText = matchedFrame.y.toFixed(2) + " m";
+      }
+    });
+  </script>
+</body>
+</html>

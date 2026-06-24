@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
+    <Document id="1">
+        <Style id="4">
+            <LineStyle id="5">
+                <color>ff0000ff</color>
+                <colorMode>normal</colorMode>
+                <width>4</width>
+            </LineStyle>
+        </Style>
+        <Placemark id="3">
+            <name>Rocket Flight Path</name>
+            <styleUrl>#4</styleUrl>
+            <LineString id="2">
+                <extrude>1</extrude>
+                <altitudeMode>absolute</altitudeMode>
+                <coordinates>-120.57239999996163,34.74199985980156,0.08004305189405332 -120.57239999605393,34.7419910530713,1.509501936962226 -120.57239997814942,34.74195524866236,3.6887141202156117 -120.57239993899238,34.74188215367262,5.039672888782914 -120.57239987483408,34.7417687656308,4.2799005381629955 -120.57239978349898,34.74161506340803,0.5147780289737589</coordinates>
+            </LineString>
+        </Placemark>
+    </Document>
+</kml>
